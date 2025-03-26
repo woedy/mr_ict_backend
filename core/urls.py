@@ -23,13 +23,19 @@ from django.contrib import admin
 from django.urls import include, path
 from django.conf.urls.static import static
 
-from video_tutorials.views import VideoUploadView, save_code_snapshot
+from video_tutorials.views import get_all_recorded_turorial_view, record_video_view, save_code_snapshot
 
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path("api/upload/", VideoUploadView.as_view(), name="video-upload"),
+
+    #path("api/upload/", VideoUploadView.as_view(), name="video-upload"),
+    path("api/upload/", record_video_view, name="video-upload"),
+
     path("api/save-code-snapshots/", save_code_snapshot, name="save_code_snapshot"),
+
+    path("api/all-recorded-videos/", get_all_recorded_turorial_view, name="all_recorded"),
+
 ]
 
 

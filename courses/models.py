@@ -1,50 +1,15 @@
 from django.db import models
 
-class School(models.Model):
-    name = models.CharField(max_length=255)
-    school_code = models.CharField(max_length=20, unique=True)  # Unique code for each school
-    logo = models.ImageField(upload_to='schools/', null=True, blank=True)
-    contact_email = models.EmailField()
-    created_at = models.DateTimeField(auto_now_add=True)
-
-
-
-class Teacher(models.Model):
-    school = models.ForeignKey(School, related_name='teachers', on_delete=models.CASCADE)
-    user = models.OneToOneField(User, on_delete=models.CASCADE)
-    subject = models.CharField(max_length=255)  # e.g., Python, JavaScript, etc.
-    assigned_courses = models.ManyToManyField(Course)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-
-
-class Classroom(models.Model):
-    teacher = models.ForeignKey(Teacher, related_name='classrooms', on_delete=models.CASCADE)
-    name = models.CharField(max_length=255)  # e.g., "Grade 9 Python Class"
-    class_code = models.CharField(max_length=20, unique=True)  # Unique class code
-    students = models.ManyToManyField(Student)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-
-class Student(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE)
-    school = models.ForeignKey(School, related_name='students', on_delete=models.CASCADE)
-    classrooms = models.ManyToManyField(Classroom)
-    progress = models.JSONField()  # Stores progress data like lessons completed, quizzes passed, etc.
-    created_at = models.DateTimeField(auto_now_add=True)
-
-
-
-
-
-####################################################################
-
 
 
 class Course(models.Model):
-    title = models.CharField(max_length=255)
+    title = models.CharField(max_length=1000, unique=True,)
     description = models.TextField()
     image = models.ImageField(upload_to='course_images/')
+
+    is_archived = models.BooleanField(default=False)
+    active = models.BooleanField(default=False)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -55,11 +20,18 @@ class Course(models.Model):
 
 class Lesson(models.Model):
     course = models.ForeignKey(Course, related_name='lessons', on_delete=models.CASCADE)
-    title = models.CharField(max_length=255)
-    content = models.TextField()
+    title = models.CharField(max_length=1000, unique=True)
+    description = models.TextField(null=True, blank=True)
+    content = models.TextField(null=True, blank=True)
     video_url = models.URLField(null=True, blank=True)
+
+    
+    is_archived = models.BooleanField(default=False)
+    active = models.BooleanField(default=False)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
     order = models.IntegerField()
 
     def __str__(self):
@@ -71,12 +43,39 @@ class Lesson(models.Model):
 
 
 
+class LessonIntroVideo(models.Model):
+    lesson = models.ForeignKey(Lesson, related_name='intro_videos', on_delete=models.CASCADE)
+    video_url = models.URLField()
+    subtitles_url = models.URLField(null=True, blank=True)  # Optional for subtitles
+    duration = models.FloatField()  # Seconds from start of video
+    video_file = models.FileField(upload_to='lesson_intro_videos/')  # Store videos in a 'videos' folder
+    language = models.CharField(max_length=50, default='English')
 
-class Video(models.Model):
+    is_archived = models.BooleanField(default=False)
+    active = models.BooleanField(default=False)
+
+    updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Intro Video for {self.lesson.title}"
+
+
+
+
+
+class LessonVideo(models.Model):
     lesson = models.ForeignKey(Lesson, related_name='videos', on_delete=models.CASCADE)
     video_url = models.URLField()
     subtitles_url = models.URLField(null=True, blank=True)  # Optional for subtitles
+    duration = models.FloatField()  # Seconds from start of video
+    video_file = models.FileField(upload_to='lesson_videos/')  # Store videos in a 'videos' folder
     language = models.CharField(max_length=50, default='English')
+
+    is_archived = models.BooleanField(default=False)
+    active = models.BooleanField(default=False)
+
+    updated_at = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -87,8 +86,18 @@ class Video(models.Model):
 
 class CodeSnippet(models.Model):
     lesson = models.ForeignKey(Lesson, related_name='snippets', on_delete=models.CASCADE)
-    code = models.TextField()  # Store the actual code
-    timestamp = models.FloatField()  # Timestamp in the video when this code should appear (in seconds)
+
+    title = models.CharField(max_length=1000)
+    timestamp = models.FloatField()  # Seconds from start of video
+    code_content = models.TextField()  # Full code at this timestamp
+    cursor_position = models.JSONField(default=dict)  # e.g. {"line": 10, "column": 15}
+    scroll_position = models.JSONField(default=dict)  # e.g. {"scrollTop": 0, "scrollLeft": 0}
+    is_highlight = models.BooleanField(default=False)
+
+    is_archived = models.BooleanField(default=False)
+    active = models.BooleanField(default=False)
+
+    updated_at = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -96,31 +105,27 @@ class CodeSnippet(models.Model):
 
 
 
-class UserProgress(models.Model):
-    user = models.ForeignKey(User, related_name='progress', on_delete=models.CASCADE)
-    lesson = models.ForeignKey(Lesson, related_name='progress', on_delete=models.CASCADE)
-    snippets_interacted_with = models.ManyToManyField(CodeSnippet, blank=True)
-    completed = models.BooleanField(default=False)
-    started_at = models.DateTimeField(null=True, blank=True)
+
+
+
+
+
+class Assignment(models.Model):
+    lesson = models.ForeignKey(Lesson, related_name='assignments', on_delete=models.CASCADE)
+    title = models.CharField(max_length=255)
+    instructions = models.TextField()
+    expected_output = models.TextField(null=True, blank=True)
+    code_template = models.TextField(null=True, blank=True)
+    difficulty = models.CharField(max_length=10, choices=[('easy', 'Easy'), ('medium', 'Medium'), ('hard', 'Hard')])
+
+    is_archived = models.BooleanField(default=False)
+    active = models.BooleanField(default=False)
+
+    updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.user.username} - {self.lesson.title}"
-
-
-
-
-
-class UserProgress(models.Model):
-    user = models.ForeignKey(User, related_name='progress', on_delete=models.CASCADE)
-    course = models.ForeignKey(Course, related_name='progress', on_delete=models.CASCADE)
-    lesson = models.ForeignKey(Lesson, related_name='progress', on_delete=models.CASCADE)
-    completed = models.BooleanField(default=False)
-    score = models.FloatField(null=True, blank=True)
-    started_at = models.DateTimeField(null=True, blank=True)
-    completed_at = models.DateTimeField(null=True, blank=True)
-
-    def __str__(self):
-        return f"{self.user.username} - {self.course.title} - {self.lesson.title}"
+        return self.title
 
 
 
@@ -128,94 +133,30 @@ class UserProgress(models.Model):
 
 
 class CodingChallenge(models.Model):
-    lesson = models.ForeignKey(Lesson, related_name='challenges', on_delete=models.CASCADE)
+    course = models.ForeignKey(Course, related_name='progress', on_delete=models.CASCADE)
     title = models.CharField(max_length=255)
     instructions = models.TextField()
     expected_output = models.TextField(null=True, blank=True)
     code_template = models.TextField(null=True, blank=True)
     difficulty = models.CharField(max_length=10, choices=[('easy', 'Easy'), ('medium', 'Medium'), ('hard', 'Hard')])
-    created_at = models.DateTimeField(auto_now_add=True)
+
+    is_archived = models.BooleanField(default=False)
+    active = models.BooleanField(default=False)
+
     updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return self.title
 
 
 
-
-
-class Assessment(models.Model):
-    lesson = models.ForeignKey(Lesson, related_name='assessments', on_delete=models.CASCADE)
-    title = models.CharField(max_length=255)
-    passing_score = models.IntegerField()  # e.g., 70% passing grade
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    def __str__(self):
-        return self.title
-
-
-
-
-
-
-
-
-class TeacherFeedback(models.Model):
-    student = models.ForeignKey(User, related_name='feedbacks', on_delete=models.CASCADE)
-    lesson = models.ForeignKey(Lesson, related_name='feedbacks', on_delete=models.CASCADE)
-    feedback = models.TextField()
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f"Feedback for {self.student.username} on {self.lesson.title}"
-
-
-
-
-
-
-
-
-class Question(models.Model):
-    assessment = models.ForeignKey(Assessment, related_name='questions', on_delete=models.CASCADE)
-    question_text = models.TextField()
-    question_type = models.CharField(max_length=20, choices=[('multiple_choice', 'Multiple Choice'), ('true_false', 'True/False')])
-    options = models.JSONField(null=True, blank=True)  # Stores options for MCQs in JSON format
-    correct_answer = models.TextField()
-
-    def __str__(self):
-        return self.question_text
-
-
-
-class StudentQuizAttempt(models.Model):
-    student = models.ForeignKey(User, related_name='quiz_attempts', on_delete=models.CASCADE)
-    assessment = models.ForeignKey(Assessment, related_name='attempts', on_delete=models.CASCADE)
-    answers = models.JSONField()  # Store the answers the student provided (JSON object)
-    score = models.IntegerField()
-    status = models.CharField(max_length=10, choices=[('passed', 'Passed'), ('failed', 'Failed')])
-    attempted_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f"Attempt by {self.student.username} on {self.assessment.title}"
-
-
-class LessonFeedback(models.Model):
-    lesson = models.ForeignKey(Lesson, related_name='feedback', on_delete=models.CASCADE)
-    student = models.ForeignKey(User, related_name='lesson_feedback', on_delete=models.CASCADE)
-    feedback_text = models.TextField()
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f"Feedback for {self.lesson.title} by {self.student.username}"
 
 
 class Badge(models.Model):
-    student = models.ForeignKey(User, related_name='badges', on_delete=models.CASCADE)
     badge_name = models.CharField(max_length=255)
+    image = models.ImageField(upload_to='badges/')
     criteria = models.TextField()
-    earned_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f"Badge {self.badge_name} earned by {self.student.username}"
