@@ -1,7 +1,7 @@
 from django.db import models
 from django.contrib.auth import get_user_model
 
-from courses.models import Badge, CodeSnippet, CodingChallenge, Lesson
+from courses.models import Badge, ChallengeBadge, LessonCodeSnippet, CodingChallenge, Course, Lesson
 from schools.models import School
 
 User = get_user_model()
@@ -23,10 +23,48 @@ class Student(models.Model):
 
 
 
+class StudentCourse(models.Model):
+    student = models.ForeignKey(Student, related_name='courses', on_delete=models.CASCADE)
+    course = models.ForeignKey(Course, related_name='courses', on_delete=models.CASCADE)
+
+    completed = models.BooleanField(default=False)
+    lessons_completed = models.IntegerField(default=0)
+    total_lessons = models.IntegerField(default=0)
+    progress_percent = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+
+    
+    is_archived = models.BooleanField(default=False)
+    active = models.BooleanField(default=False)
+
+    updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+    def __str__(self):
+        return f"{self.user.username} - {self.lesson.title}"
 
 
 
-class StudentNote(models.Model):
+class StudentCourseLesson(models.Model):
+    course = models.ForeignKey(StudentCourse, related_name='student_course', on_delete=models.CASCADE)
+    lesson = models.ForeignKey(Lesson, related_name='lesson', on_delete=models.CASCADE)
+    completed = models.BooleanField(default=False)
+
+    resume_code = models.ForeignKey(LessonCodeSnippet, related_name='resume_code', on_delete=models.CASCADE)
+
+    is_archived = models.BooleanField(default=False)
+    active = models.BooleanField(default=False)
+
+    updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+    def __str__(self):
+        return f"{self.user.username} - {self.lesson.title}"
+
+
+
+class LessonNote(models.Model):
     student = models.ForeignKey(Student, related_name='notes', on_delete=models.CASCADE)
     lesson = models.ForeignKey(Lesson, related_name='notes', on_delete=models.CASCADE)
 
@@ -43,9 +81,9 @@ class StudentNote(models.Model):
 
 
 
-class StudentNoteSnippet(models.Model):
-    note = models.ForeignKey(StudentNote, related_name='note_snippet', on_delete=models.CASCADE)
-    snippet_interacted_with = models.ForeignKey(CodeSnippet, related_name='code_snippet', on_delete=models.CASCADE)
+class LessonNoteSnippet(models.Model):
+    note = models.ForeignKey(LessonNote, related_name='note_snippet', on_delete=models.CASCADE)
+    snippet_interacted_with = models.ForeignKey(LessonCodeSnippet, related_name='code_snippet', on_delete=models.CASCADE)
     edited_code_content = models.TextField()
 
     completed = models.BooleanField(default=False)
@@ -54,6 +92,44 @@ class StudentNoteSnippet(models.Model):
 
 
 
+
+
+class StudentChallenge(models.Model):
+    student = models.ForeignKey(Student, related_name='challenges', on_delete=models.CASCADE)
+    challenge = models.ForeignKey(CodingChallenge, related_name='challenges', on_delete=models.CASCADE)
+
+    completed = models.BooleanField(default=False)
+
+    
+    is_archived = models.BooleanField(default=False)
+    active = models.BooleanField(default=False)
+
+    updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+    def __str__(self):
+        return f"{self.user.username} - {self.lesson.title}"
+
+
+
+
+class ResumeLeaning(models.Model):
+    student = models.ForeignKey(Student, related_name='resume', on_delete=models.CASCADE)
+    challenge = models.ForeignKey(CodingChallenge, related_name='challenges', on_delete=models.CASCADE)
+
+    completed = models.BooleanField(default=False)
+
+    
+    is_archived = models.BooleanField(default=False)
+    active = models.BooleanField(default=False)
+
+    updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+    def __str__(self):
+        return f"{self.user.username} - {self.lesson.title}"
 
 
 
@@ -83,7 +159,7 @@ class LessonFeedback(models.Model):
 
 class StudentBadge(models.Model):
     student = models.ForeignKey(User, related_name='badges', on_delete=models.CASCADE)
-    badge = models.ForeignKey(Badge, related_name='badge', on_delete=models.CASCADE)
+    badge = models.ForeignKey(ChallengeBadge, related_name='badge', on_delete=models.CASCADE)
     coding_challenge = models.ForeignKey(CodingChallenge, related_name='challenge', on_delete=models.CASCADE)
 
     earned_at = models.DateTimeField(auto_now_add=True)

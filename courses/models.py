@@ -84,7 +84,7 @@ class LessonVideo(models.Model):
 
 
 
-class CodeSnippet(models.Model):
+class LessonCodeSnippet(models.Model):
     lesson = models.ForeignKey(Lesson, related_name='snippets', on_delete=models.CASCADE)
 
     title = models.CharField(max_length=1000)
@@ -93,6 +93,9 @@ class CodeSnippet(models.Model):
     cursor_position = models.JSONField(default=dict)  # e.g. {"line": 10, "column": 15}
     scroll_position = models.JSONField(default=dict)  # e.g. {"scrollTop": 0, "scrollLeft": 0}
     is_highlight = models.BooleanField(default=False)
+    
+    output = models.TextField(null=True, blank=True)
+
 
     is_archived = models.BooleanField(default=False)
     active = models.BooleanField(default=False)
@@ -110,7 +113,7 @@ class CodeSnippet(models.Model):
 
 
 
-class Assignment(models.Model):
+class LessonAssignment(models.Model):
     lesson = models.ForeignKey(Lesson, related_name='assignments', on_delete=models.CASCADE)
     title = models.CharField(max_length=255)
     instructions = models.TextField()
@@ -153,7 +156,7 @@ class CodingChallenge(models.Model):
 
 
 
-class Badge(models.Model):
+class ChallengeBadge(models.Model):
     badge_name = models.CharField(max_length=255)
     image = models.ImageField(upload_to='badges/')
     criteria = models.TextField()
