@@ -14,4 +14,4 @@ django-cors-headers
 daphne
 djangorestframework-simplejwt
 gunicorn
-moviepy
+ffmpeg-python

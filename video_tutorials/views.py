@@ -1,6 +1,10 @@
-from moviepy import VideoFileClip
 from rest_framework.response import Response
 from rest_framework import status
+import ffmpeg
+import os
+import tempfile
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
 
 from video_tutorials.models import CodeSnapshotRecording, Recording
 from rest_framework.decorators import api_view
@@ -19,9 +23,8 @@ from rest_framework.permissions import IsAuthenticated
 from video_tutorials.serializers import AllRecordingsSerializer, CodeSnapshotRecordingSerializer, RecordingSerializer
 
 
+
 @api_view(['POST'])
-#@permission_classes([IsAuthenticated])
-#@authentication_classes([TokenAuthentication])
 def record_video_view(request):
     payload = {}
     data = {}
@@ -46,32 +49,58 @@ def record_video_view(request):
         if not duration:
             errors['duration'] = ['Duration is required.']
  
-
         if errors:
             payload['message'] = "Errors"
             payload['errors'] = errors
             return Response(payload, status=status.HTTP_400_BAD_REQUEST)
 
+        try:
+            # Create a temporary file to store the uploaded video
+            with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
+                tmp_file.write(video_file.read())
+                tmp_file_path = tmp_file.name
 
+            # Set the output path for the converted video (use a valid Windows path)
+            output_path = f'C:/temp/{title}.mp4'  # Change this to your desired directory
 
-        new_video = Recording.objects.create(
-            title=title,
-            description=description,
-            video_file=video_file,
-            duration=duration
+            # Ensure the output directory exists
+            os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
-        )
+            # Perform the conversion
+            ffmpeg.input(tmp_file_path).output(output_path).run()
 
-        data['video_id'] = new_video.id
+            # Read the converted file and store it in Django storage
+            with open(output_path, 'rb') as f:
+                mp4_video = ContentFile(f.read(), name=f'{title}.mp4')
+                video_path = default_storage.save(f'media/videos/{title}.mp4', mp4_video)
 
-        payload['message'] = "Successful"
-        payload['data'] = data
+            # Delete the temporary files after conversion
+            os.remove(tmp_file_path)
+            os.remove(output_path)
+
+            # Create the new video record in the database
+            new_video = Recording.objects.create(
+                title=title,
+                description=description,
+                video_file=video_path,
+                duration=duration
+            )
+
+            #Set code snippet IDs
+            # Use a batch update with `update()` to set the `recording` field for all matching records
+            CodeSnapshotRecording.objects.filter(title=title).update(recording=new_video)
+
+            data['video_id'] = new_video.id
+
+            payload['message'] = "Successful"
+            payload['data'] = data
+
+        except Exception as e:
+            payload['message'] = "Error during video conversion"
+            payload['errors'] = str(e)
+            return Response(payload, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     return Response(payload)
-
-
-
-
 
 
 
@@ -219,7 +248,7 @@ def get_video_tutorial_details_view(request):
     data['video_url'] = _video.video_file.url
 
 
-    code_snippets = CodeSnapshotRecording.objects.filter(title=_video.title)
+    code_snippets = CodeSnapshotRecording.objects.filter(recording=_video)
     code_snippets_serializer = CodeSnapshotRecordingSerializer(code_snippets, many=True)
     code_snippets = code_snippets_serializer.data if code_snippets_serializer else []
 
