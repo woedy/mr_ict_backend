@@ -18,7 +18,6 @@ class CodeSnapshotRecordingSerializer(serializers.ModelSerializer):
         model = CodeSnapshotRecording
         fields = [
             "id",
-            "recording",
             "timestamp",
             "code_content",
             "cursor_position",

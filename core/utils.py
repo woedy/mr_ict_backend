@@ -55,3 +55,19 @@ def generate_email_token():
         code += str(random.randint(0, 9))
     return code
 
+
+
+def unique_school_id_generator(instance):
+    """
+    This is for a school_id field
+    :param instance:
+    :return:
+    """
+    size = random.randint(5, 10)
+    school_id = "SCH-" + random_string_generator(size=size, chars=string.ascii_uppercase + string.digits) + "-OL"
+
+    Klass = instance.__class__
+    qs_exists = Klass.objects.filter(school_id=school_id).exists()
+    if qs_exists:
+        return None
+    return school_id

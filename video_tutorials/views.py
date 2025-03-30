@@ -1,3 +1,4 @@
+from moviepy import VideoFileClip
 from rest_framework.response import Response
 from rest_framework import status
 
@@ -15,7 +16,7 @@ from django.conf import settings
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
 
-from video_tutorials.serializers import AllRecordingsSerializer
+from video_tutorials.serializers import AllRecordingsSerializer, CodeSnapshotRecordingSerializer, RecordingSerializer
 
 
 @api_view(['POST'])
@@ -75,7 +76,7 @@ def record_video_view(request):
 
 
 @api_view(['POST'])
-def save_code_snapshot(request):
+def save_code_snapshot_orijay(request):
     payload = {}
     data = {}
     errors = {}
@@ -112,6 +113,123 @@ def save_code_snapshot(request):
 
     return Response(payload)
 
+
+
+@api_view(['POST'])
+def save_code_snapshot(request):
+    """
+    API endpoint to save batches of code snapshots
+    """
+    payload = {
+        'message': '',
+        'data': {},
+        'errors': {},
+        'success_count': 0,
+        'error_count': 0
+    }
+
+    if request.method == 'POST':
+        snapshots = request.data.get('snapshots', [])
+        title = request.data.get('title', '')
+        
+        if not title:
+            payload['errors']['title'] = ['Title is required.']
+            payload['message'] = "Error: Missing title"
+            return Response(payload, status=status.HTTP_400_BAD_REQUEST)
+
+        if not snapshots:
+            payload['errors']['snapshots'] = ['No snapshots provided.']
+            payload['message'] = "Error: No snapshots"
+            return Response(payload, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Use bulk_create for better performance with multiple snapshots
+        snapshots_to_create = []
+        
+        for index, snapshot in enumerate(snapshots):
+            try:
+                code_content = snapshot.get('code', "")
+                cursor_position = snapshot.get('cursorPosition', {})
+                scroll_position = snapshot.get('scrollPosition', {})
+                timestamp = snapshot.get('timestamp', 0)
+                
+                if not code_content:
+                    payload['error_count'] += 1
+                    payload['errors'][f'snapshot_{index}'] = 'Code content is empty.'
+                    continue
+                
+                # Prepare object for bulk creation
+                snapshots_to_create.append(
+                    CodeSnapshotRecording(
+                        title=title,
+                        code_content=code_content,
+                        cursor_position=cursor_position,
+                        scroll_position=scroll_position,
+                        timestamp=timestamp
+                    )
+                )
+                payload['success_count'] += 1
+                
+            except Exception as e:
+                payload['error_count'] += 1
+                payload['errors'][f'snapshot_{index}'] = str(e)
+        
+        # Bulk create all valid snapshots at once (more efficient)
+        if snapshots_to_create:
+            try:
+                CodeSnapshotRecording.objects.bulk_create(snapshots_to_create)
+                payload['message'] = f"Successfully saved {len(snapshots_to_create)} snapshots"
+                payload['data']['saved_count'] = len(snapshots_to_create)
+            except Exception as e:
+                payload['message'] = f"Error during bulk save: {str(e)}"
+                payload['errors']['bulk_save'] = str(e)
+                return Response(payload, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        else:
+            payload['message'] = "No valid snapshots to save"
+            
+    return Response(payload, status=status.HTTP_200_OK if payload['success_count'] > 0 else status.HTTP_400_BAD_REQUEST)
+
+
+
+
+@api_view(['GET', ])
+def get_video_tutorial_details_view(request):
+    payload = {}
+    data = {}
+    errors = {}
+
+    video_id = request.query_params.get('video_id', None)
+
+    #if not video_id:
+    #    errors['video_id'] = ["Video id required"]
+
+    #try:
+    #    _video = Recording.objects.get(video_id=video_id)
+    #except Recording.DoesNotExist:
+    #    errors['video_id'] = ['Recording does not exist.']
+
+    if errors:
+        payload['message'] = "Errors"
+        payload['errors'] = errors
+        return Response(payload, status=status.HTTP_400_BAD_REQUEST)
+
+    _video = Recording.objects.order_by('-id').first()
+
+
+
+    data['video_url'] = _video.video_file.url
+
+
+    code_snippets = CodeSnapshotRecording.objects.filter(title=_video.title)
+    code_snippets_serializer = CodeSnapshotRecordingSerializer(code_snippets, many=True)
+    code_snippets = code_snippets_serializer.data if code_snippets_serializer else []
+
+    data['code_snippets'] = code_snippets
+
+
+    payload['message'] = "Successful"
+    payload['data'] = data
+
+    return Response(payload, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])
@@ -170,3 +288,57 @@ def get_all_recorded_turorial_view(request):
     return Response(payload, status=status.HTTP_200_OK)
 
 
+
+
+
+def cut_video_and_code(request):
+    data = json.loads(request.body)
+    video_id = data['videoId']
+    start_time = data['start']
+    end_time = data['end']
+
+    # Step 1: Cut the video (you can use a library like moviepy or ffmpeg)
+    # This utility function will handle video cutting and save the new video file
+    cut_video(video_id, start_time, end_time)
+
+    # Step 2: Remove code snapshots in the cut range
+    CodeSnapshotRecording.objects.filter(
+        timestamp__gte=start_time,
+        timestamp__lte=end_time,
+        video_id=video_id
+    ).delete()  # This will delete all code snapshots that fall within the cut range
+
+    # Step 3: Adjust the timestamps of the remaining code snapshots that are after the cut range
+    CodeSnapshotRecording.objects.filter(
+        timestamp__gt=end_time,
+        video_id=video_id
+    ).update(
+        timestamp=F('timestamp') - (end_time - start_time)  # Adjust the timestamps
+    )
+
+    # Step 4: Optionally return the updated list of code snapshots
+    remaining_snippets = CodeSnapshotRecording.objects.filter(video_id=video_id).values('id', 'timestamp', 'code_content', 'cursor_position', 'scroll_position')
+    
+    return JsonResponse({'updatedSnippets': list(remaining_snippets)})
+
+
+
+
+
+
+
+
+
+
+#from moviepy.editor import VideoFileClip
+
+def cut_video(video_id, start_time, end_time):
+    video_path = f'/path/to/videos/{video_id}.mp4'
+    output_path = f'/path/to/output/{video_id}_cut.mp4'
+    
+    video_clip = VideoFileClip(video_path)
+    cut_clip = video_clip.subclip(start_time, end_time)
+    cut_clip.write_videofile(output_path)
+    
+    # Optionally, update your video file path in the database if you want to store it
+    # Video.objects.filter(id=video_id).update(video_file=output_path)

@@ -1,7 +1,7 @@
 from django.db import models
 from django.contrib.auth import get_user_model
 
-from courses.models import Badge, ChallengeBadge, LessonCodeSnippet, CodingChallenge, Course, Lesson
+from courses.models import ChallengeBadge, LessonCodeSnippet, CodingChallenge, Course, Lesson
 from schools.models import School
 
 User = get_user_model()
@@ -96,7 +96,7 @@ class LessonNoteSnippet(models.Model):
 
 class StudentChallenge(models.Model):
     student = models.ForeignKey(Student, related_name='challenges', on_delete=models.CASCADE)
-    challenge = models.ForeignKey(CodingChallenge, related_name='challenges', on_delete=models.CASCADE)
+    challenge = models.ForeignKey(CodingChallenge, related_name='student_challenges', on_delete=models.CASCADE)
 
     completed = models.BooleanField(default=False)
 

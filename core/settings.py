@@ -29,6 +29,18 @@ DEBUG = True
 ALLOWED_HOSTS = ["*"]
 
 
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = "smtp.gmail.com"
+EMAIL_HOST_USER = "etornamasamoah@gmail.com"
+EMAIL_HOST_PASSWORD = "nygmdsnhaxxlrsem"
+# EMAIL_PORT = 587
+# EMAIL_USE_TLS = True
+EMAIL_PORT = 465
+EMAIL_USE_SSL = True
+DEFAULT_FROM_EMAIL = "<Mr ICT /> <mrict@gmail.com>"
+BASE_URL = "0.0.0.0:80"
+
+
 # Application definition
 
 INSTALLED_APPS = [
@@ -46,7 +58,17 @@ INSTALLED_APPS = [
     "corsheaders",
     
     "video_tutorials",
+    'accounts',
+    'assessments',
+    'courses',
+    'schools',
+    'students',
+    'teachers'
 ]
+
+
+AUTH_USER_MODEL = "accounts.User"
+
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -65,7 +87,7 @@ ROOT_URLCONF = "core.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [os.path.join(BASE_DIR, "templates")],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -91,6 +113,26 @@ DATABASES = {
         "NAME": BASE_DIR / "db.sqlite3",
     }
 }
+
+
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.postgresql',
+#         'NAME': 'god_blass_postgres',
+#         'USER': 'god_blass_postgres',
+#         'PASSWORD': 'god_blass_postgres',
+#         'HOST': 'db',
+#         'PORT': 5432,
+#      }
+# }
+
+
+
+
+CELERY_BROKER_URL = "redis://redis:6379"
+CELERY_RESULT_BACKEND = "redis://redis:6379"
+
+
 
 
 # Password validation
@@ -142,6 +184,23 @@ MEDIA_ROOT = os.path.join(BASE_DIR, "media")  # Separate media files
 
 
 
+from celery import Celery
+
+app = Celery("god_bless_pro")
+app.config_from_object("django.conf:settings", namespace="CELERY")
+app.autodiscover_tasks()
+
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [("redis", 6379)],
+        },
+    },
+}
+
+
 
 
 CORS_ALLOW_ALL_ORIGINS = True
@@ -150,3 +209,17 @@ CORS_ALLOWED_ORIGINS = []
 CORS_ALLOW_CREDENTIALS = True
 
 FILE_UPLOAD_MAX_MEMORY_SIZE = 10485760  # 10 MB (Adjust as needed)
+
+
+# REST_FRAMEWORK = {
+#    'DEFAULT_AUTHENTICATION_CLASSES': (
+#        'rest_framework_simplejwt.authentication.JWTAuthentication',
+#        # Add other authentication classes as needed
+#    ),
+# }
+
+
+# SIMPLE_JWT = {
+#    'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
+#    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+# }
