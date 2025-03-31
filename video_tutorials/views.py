@@ -40,8 +40,8 @@ def record_video_view(request):
         if not title:
             errors['title'] = ['Title is required.']
 
-        if not description:
-            errors['description'] = ['Description is required.']
+        #if not description:
+        #    errors['description'] = ['Description is required.']
  
         if not video_file:
             errors['video_file'] = ['Video is required.']
